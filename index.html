@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lead Radar // Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --abyss: #071219;
+    --panel: #0D1E27;
+    --panel-raised: #123040;
+    --grid-line: #1B3644;
+    --phosphor: #FFB454;
+    --phosphor-dim: #6B4A1F;
+    --signal: #5EEAD4;
+    --signal-dim: #1F4E48;
+    --text: #E8F1F1;
+    --muted: #6E8B98;
+    --alert: #FF6B5E;
+    --radius-lg: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 20% -10%, rgba(255,180,84,0.06), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 0%, rgba(94,234,212,0.05), transparent),
+      var(--abyss);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ambient scanline drift */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 2px,
+      rgba(255,255,255,0.008) 3px,
+      transparent 4px
+    );
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 2;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 28px 24px 90px;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding-bottom: 22px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--grid-line);
+    animation: fadeRise 0.5s ease both;
+  }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .mark {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1.5px solid var(--phosphor-dim);
+    position: relative;
+    flex-shrink: 0;
+    background:
+      repeating-radial-gradient(circle, transparent 0, transparent 7px, rgba(255,180,84,0.12) 8px);
+  }
+  .mark::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0deg, var(--phosphor) 22deg, transparent 55deg);
+    animation: sweepRotate 3s linear infinite;
+    opacity: 0.9;
+  }
+  .mark::after {
+    content: '';
+    position: absolute; inset: 46%;
+    background: var(--phosphor);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--phosphor);
+  }
+  .brand h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .brand p {
+    margin: 1px 0 0;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+  }
+  .hud-readout {
+    display: flex;
+    gap: 22px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .hud-readout .stat { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+  .hud-readout .stat .lbl { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
+  .hud-readout .stat .val { color: var(--text); font-size: 13px; }
+  .hud-readout .stat .val.on { color: var(--signal); }
+  .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--muted); margin-right:6px; }
+  .dot.live { background: var(--signal); box-shadow: 0 0 6px var(--signal); animation: pulseDot 1.6s ease-in-out infinite; }
+
+  /* ---------- layout ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: linear-gradient(180deg, var(--panel), rgba(13,30,39,0.85));
+    border: 1px solid var(--grid-line);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    animation: fadeRise 0.55s ease both;
+  }
+  .panel + .panel { margin-top: 20px; }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .panel-head h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    margin: 0;
+  }
+  .panel-head .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    border: 1px solid var(--grid-line);
+    border-radius: 20px;
+    padding: 3px 10px;
+  }
+
+  /* ---------- config form ---------- */
+  label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 16px 0 7px;
+  }
+  label:first-of-type { margin-top: 0; }
+  input {
+    width: 100%;
+    background: var(--panel-raised);
+    border: 1px solid var(--grid-line);
+    color: var(--text);
+    padding: 11px 13px;
+    border-radius: var(--radius-sm);
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus {
+    outline: none;
+    border-color: var(--phosphor-dim);
+    box-shadow: 0 0 0 3px rgba(255,180,84,0.08);
+  }
+  input::placeholder { color: #3E5964; }
+
+  .btn {
+    width: 100%;
+    margin-top: 22px;
+    background: var(--phosphor);
+    color: #1B1204;
+    border: none;
+    padding: 13px;
+    border-radius: var(--radius-sm);
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s, box-shadow 0.15s;
+    box-shadow: 0 0 0 rgba(255,180,84,0);
+  }
+  .btn:hover { filter: brightness(1.1); box-shadow: 0 0 22px rgba(255,180,84,0.25); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; filter:none; box-shadow:none; }
+  .btn.secondary {
+    background: transparent;
+    border: 1px solid var(--grid-line);
+    color: var(--signal);
+    margin-top: 10px;
+  }
+  .btn.secondary:hover { border-color: var(--signal); box-shadow: 0 0 16px rgba(94,234,212,0.15); }
+  .btn .spinner {
+    display: inline-block;
+    width: 13px; height: 13px;
+    border: 2px solid rgba(0,0,0,0.25);
+    border-top-color: #1B1204;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: -2px;
+    animation: spin 0.7s linear infinite;
+  }
+  .msg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    margin-top: 11px;
+    min-height: 14px;
+    color: var(--signal);
+  }
+  .msg.error { color: var(--alert); }
+
+  /* ---------- radar scope ---------- */
+  .scope-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 6px 0 2px;
+  }
+  .scope { width: 100%; max-width: 380px; aspect-ratio: 1; position: relative; }
+  .scope svg { width: 100%; height: 100%; overflow: visible; }
+  .ring { fill: none; stroke: var(--grid-line); stroke-width: 1; }
+  .tick { stroke: var(--grid-line); stroke-width: 1; }
+  .crosshair { stroke: var(--grid-line); stroke-width: 1; }
+  .sweep-mask {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .sweep-mask .blade {
+    position: absolute; inset: 0;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(255,180,84,0.28) 30deg, transparent 70deg);
+    animation: sweepRotate 4s linear infinite;
+    mix-blend-mode: screen;
+  }
+  .scanning .sweep-mask .blade { animation-duration: 1.1s; }
+  .blip circle.core { fill: var(--phosphor); }
+  .blip.verified circle.core { fill: var(--signal); }
+  .blip circle.ping {
+    fill: none;
+    stroke: var(--phosphor);
+    stroke-width: 1.2;
+    opacity: 0;
+  }
+  .blip.verified circle.ping { stroke: var(--signal); }
+  .blip.fresh circle.ping { animation: blipPing 2.2s ease-out infinite; }
+  .blip text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5px;
+    fill: var(--muted);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .blip:hover text { opacity: 1; }
+  .blip:hover circle.core { r: 4.5; cursor: pointer; }
+  .scope-empty {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 6px;
+    text-align: center; padding: 20px;
+  }
+  .scope-empty p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0;
+    max-width: 220px;
+  }
+
+  /* ---------- manifest table ---------- */
+  .manifest-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .manifest-head input {
+    max-width: 220px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--grid-line);
+    padding: 0 10px 10px;
+    font-weight: 500;
+  }
+  tbody td {
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--grid-line);
+    font-size: 13px;
+    vertical-align: top;
+  }
+  tbody tr {
+    animation: fadeRise 0.4s ease both;
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: rgba(255,180,84,0.045); }
+  tbody tr.highlight { background: rgba(94,234,212,0.08); }
+  .name { font-weight: 600; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
+  .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 20px;
+    border: 1px solid var(--signal-dim);
+    color: var(--signal);
+  }
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state h3 {
+    font-family: 'Rajdhani', sans-serif;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+  .empty-state p { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin: 0; }
+  a.web-link { color: var(--signal); text-decoration: none; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  a.web-link:hover { text-decoration: underline; }
+
+  /* ---------- keyframes ---------- */
+  @keyframes sweepRotate { to { transform: rotate(360deg); } }
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes blipPing {
+    0% { r: 3; opacity: 0.9; }
+    100% { r: 14; opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1>Lead Radar</h1>
+        <p>Private daily scan &middot; local business detection</p>
+      </div>
+    </div>
+    <div class="hud-readout">
+      <div class="stat">
+        <span class="lbl">Link</span>
+        <span class="val" id="linkStat"><span class="dot"></span>checking</span>
+      </div>
+      <div class="stat">
+        <span class="lbl">Contacts</span>
+        <span class="val on" id="countStat">0</span>
+      </div>
+      <div class="stat">
+        <span class="lbl">Local time</span>
+        <span class="val" id="clock">--:--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Config</h2>
+        <span class="tag">CTRL</span>
+      </div>
+
+      <label for="query">Business type</label>
+      <input id="query" placeholder="restaurant, dentist, electrician..." />
+
+      <label for="location">Location</label>
+      <input id="location" placeholder="e.g. Peshawar, Pakistan" />
+
+      <label for="radius">Search radius (meters)</label>
+      <input id="radius" type="number" min="500" max="50000" />
+
+      <label for="email">Notify email</label>
+      <input id="email" placeholder="you@example.com" />
+
+      <label for="leadsPerRun">Leads per run</label>
+      <input id="leadsPerRun" type="number" min="1" max="50" />
+
+      <label for="webhook">n8n webhook endpoint</label>
+      <input id="webhook" placeholder="https://your-n8n.app/webhook/lead-radar" />
+
+      <button class="btn secondary" id="saveBtn">Save configuration</button>
+      <button class="btn" id="triggerBtn">Initiate scan</button>
+      <div class="msg" id="saveMsg"></div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Scope</h2>
+          <span class="tag" id="scopeTag">0 contacts</span>
+        </div>
+        <div class="scope-wrap">
+          <div class="scope" id="scope">
+            <svg viewBox="0 0 300 300">
+              <circle class="ring" cx="150" cy="150" r="32.5" />
+              <circle class="ring" cx="150" cy="150" r="65" />
+              <circle class="ring" cx="150" cy="150" r="97.5" />
+              <circle class="ring" cx="150" cy="150" r="130" />
+              <line class="crosshair" x1="150" y1="20" x2="150" y2="280" />
+              <line class="crosshair" x1="20" y1="150" x2="280" y2="150" />
+              <g id="blips"></g>
+            </svg>
+            <div class="sweep-mask"><div class="blade"></div></div>
+            <div class="scope-empty" id="scopeEmpty">
+              <p>NO CONTACTS ON SCOPE — run a scan to populate this display.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="manifest-head">
+          <h2 style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0;">Manifest</h2>
+          <input id="searchBox" placeholder="Filter contacts..." />
+          <span class="tag" id="leadCount">0 leads</span>
+        </div>
+        <div id="leadsContainer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function tickClock() {
+  $('clock').textContent = new Date().toLocaleTimeString('en-GB', { hour12: false });
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    $('query').value = cfg.query || '';
+    $('location').value = cfg.location || '';
+    $('radius').value = cfg.radius_meters || 5000;
+    $('email').value = cfg.email || '';
+    $('leadsPerRun').value = cfg.leads_per_run || 10;
+    $('webhook').value = cfg.n8n_webhook_url || '';
+    const linked = !!cfg.n8n_webhook_url;
+    $('linkStat').innerHTML = `<span class="dot ${linked ? 'live' : ''}"></span>${linked ? 'connected' : 'not linked'}`;
+  } catch (e) {
+    $('linkStat').innerHTML = `<span class="dot"></span>offline`;
+  }
+}
+
+async function saveConfig() {
+  const body = {
+    query: $('query').value.trim(),
+    location: $('location').value.trim(),
+    radius_meters: Number($('radius').value) || 5000,
+    email: $('email').value.trim(),
+    leads_per_run: Number($('leadsPerRun').value) || 10,
+    n8n_webhook_url: $('webhook').value.trim()
+  };
+  await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  flashMsg('Configuration saved.', false);
+  loadConfig();
+}
+
+function flashMsg(text, isError) {
+  const el = $('saveMsg');
+  el.textContent = text;
+  el.className = 'msg' + (isError ? ' error' : '');
+  setTimeout(() => { el.textContent = ''; }, 3200);
+}
+
+async function triggerNow() {
+  const btn = $('triggerBtn');
+  const scope = $('scope');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Scanning...';
+  scope.classList.add('scanning');
+  try {
+    const res = await fetch('/api/trigger', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) {
+      flashMsg(data.error || 'Trigger failed — check the webhook URL.', true);
+    } else {
+      flashMsg('Scan dispatched. Contacts will populate shortly.', false);
+      setTimeout(loadLeads, 4000);
+    }
+  } catch (e) {
+    flashMsg('Signal lost: ' + e.message, true);
+  }
+  setTimeout(() => scope.classList.remove('scanning'), 2500);
+  btn.disabled = false;
+  btn.textContent = 'Initiate scan';
+}
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; }
+  return Math.abs(h);
+}
+
+function renderScope(leads) {
+  const g = $('blips');
+  g.innerHTML = '';
+  $('scopeEmpty').style.display = leads.length ? 'none' : 'flex';
+  $('scopeTag').textContent = leads.length + (leads.length === 1 ? ' contact' : ' contacts');
+
+  const now = Date.now();
+  leads.slice(0, 24).forEach((lead) => {
+    const id = lead.id || lead.name;
+    const h1 = hashStr(id + 'a');
+    const h2 = hashStr(id + 'b');
+    const angle = (h1 % 360) * Math.PI / 180;
+    const radiusFrac = 0.20 + (h2 % 78) / 100;
+    const maxR = 130;
+    const cx = 150 + Math.cos(angle) * radiusFrac * maxR;
+    const cy = 150 + Math.sin(angle) * radiusFrac * maxR;
+    const verified = !!(lead.phone || lead.website);
+    const isFresh = lead.scraped_at && (now - new Date(lead.scraped_at).getTime() < 24 * 3600 * 1000);
+
+    const blip = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    blip.setAttribute('class', `blip ${verified ? 'verified' : ''} ${isFresh ? 'fresh' : ''}`);
+    blip.setAttribute('data-id', id);
+    blip.innerHTML = `
+      <circle class="ping" cx="${cx}" cy="${cy}" r="3"></circle>
+      <circle class="core" cx="${cx}" cy="${cy}" r="3"></circle>
+      <text x="${cx + 7}" y="${cy + 3}">${escapeHtml((lead.name || '').slice(0, 18))}</text>
+    `;
+    blip.addEventListener('click', () => highlightRow(id));
+    g.appendChild(blip);
+  });
+}
+
+function highlightRow(id) {
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('highlight'));
+  const row = document.querySelector(`tr[data-id="${CSS.escape(String(id))}"]`);
+  if (row) {
+    row.classList.add('highlight');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+async function loadLeads() {
+  const q = $('searchBox').value.trim();
+  const res = await fetch('/api/leads' + (q ? '?q=' + encodeURIComponent(q) : ''));
+  const leads = await res.json();
+  $('leadCount').textContent = leads.length + ' leads';
+  $('countStat').textContent = leads.length;
+
+  renderScope(leads);
+
+  if (leads.length === 0) {
+    $('leadsContainer').innerHTML = `
+      <div class="empty-state">
+        <h3>No contacts logged</h3>
+        <p>Save your configuration and initiate a scan, or wait for the daily cron.</p>
+      </div>`;
+    return;
+  }
+
+  const rows = leads.map((l, i) => `
+    <tr data-id="${escapeAttr(l.id || l.name)}" style="animation-delay:${Math.min(i * 30, 400)}ms">
+      <td class="name">${escapeHtml(l.name || '-')}</td>
+      <td class="mono">${escapeHtml(l.category || '-')}</td>
+      <td class="mono">${escapeHtml(l.address || '-')}</td>
+      <td class="mono">${escapeHtml(l.phone || '-')}</td>
+      <td>${l.website ? `<a class="web-link" href="${escapeAttr(l.website)}" target="_blank">visit &#8599;</a>` : '<span class="mono">-</span>'}</td>
+      <td>${(l.phone || l.website) ? '<span class="badge">verified</span>' : '<span class="mono">-</span>'}</td>
+    </tr>
+  `).join('');
+
+  $('leadsContainer').innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Category</th><th>Address</th><th>Phone</th><th>Website</th><th>Status</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+$('saveBtn').addEventListener('click', saveConfig);
+$('triggerBtn').addEventListener('click', triggerNow);
+$('searchBox').addEventListener('input', debounce(loadLeads, 250));
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+loadConfig();
+loadLeads();
+setInterval(loadLeads, 15000);
+</script>
+</body>
+</html>
