@@ -9,6 +9,14 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime() });
+});
+
 const DB_PATH = path.join(__dirname, 'db.json');
 
 // ---------- tiny JSON "database" ----------
