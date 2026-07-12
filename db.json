@@ -1,0 +1,11 @@
+{
+  "config": {
+    "query": "restaurants in Peshawar",
+    "location": "Peshawar, Pakistan",
+    "email": "waqasaps001@gmail.com",
+    "n8n_webhook_url": "https://waqas5.app.n8n.cloud/webhook-test/lead-radar",
+    "leads_per_run": 10,
+    "radius_meters": 5000
+  },
+  "leads": []
+}

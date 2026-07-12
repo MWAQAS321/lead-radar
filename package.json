@@ -1,0 +1,12 @@
+{
+  "name": "local-lead-radar",
+  "version": "1.0.0",
+  "description": "Private daily lead-generation dashboard, fed by an n8n scraping workflow.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
