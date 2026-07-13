@@ -625,6 +625,7 @@ async function loadLeads() {
       <td class="mono">${escapeHtml(l.address || '-')}</td>
       <td class="mono">${escapeHtml(l.phone || '-')}</td>
       <td>${l.website ? `<a class="web-link" href="${escapeAttr(l.website)}" target="_blank">visit &#8599;</a>` : '<span class="mono">-</span>'}</td>
+      <td>${l.maps_link ? `<a class="web-link" href="${escapeAttr(l.maps_link)}" target="_blank">map &#8599;</a>` : '<span class="mono">-</span>'}</td>
       <td>${(l.phone || l.website) ? '<span class="badge">verified</span>' : '<span class="mono">-</span>'}</td>
     </tr>
   `).join('');
@@ -632,7 +633,7 @@ async function loadLeads() {
   $('leadsContainer').innerHTML = `
     <table>
       <thead>
-        <tr><th>Name</th><th>Category</th><th>Address</th><th>Phone</th><th>Website</th><th>Status</th></tr>
+        <tr><th>Name</th><th>Category</th><th>Address</th><th>Phone</th><th>Website</th><th>Map</th><th>Status</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
